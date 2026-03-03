@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>NAZA MINA - Auditoria de Logs</title>
+
+<!-- SheetJS (XLSX) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+:root{
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --ink:#0f172a;
+  --muted:#51627a;
+  --line:rgba(15,23,42,.12);
+  --ok:#1f9d55;
+  --warn:#c58b00;
+  --bad:#d92d20;
+  --blue:#1d74f5;
+  --shadow:rgba(2,6,23,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#eef4ff,#f7fafc);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+header{padding:18px 18px 8px}
+h1{margin:0 0 6px;font-size:18px}
+.sub{color:var(--muted);font-size:12px}
+.wrap{padding:12px 18px 20px}
+.grid{display:grid;grid-template-columns: 420px 1fr;gap:12px;align-items:start}
+@media (max-width:1200px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px var(--shadow);overflow:hidden}
+.card h2{margin:0;padding:12px 12px 10px;font-size:14px;border-bottom:1px solid var(--line)}
+.card .body{padding:12px}
+.row{display:grid;grid-template-columns: 1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns: 1fr 1fr 1fr;gap:10px}
+.row1{display:grid;grid-template-columns:1fr;gap:10px}
+label{display:block;color:var(--muted);font-size:11px;margin:0 0 6px}
+input,select,button,textarea{
+  width:100%;
+  padding:10px 10px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:#ffffff;
+  color:var(--ink);
+  outline:none;
+}
+textarea{min-height:110px;resize:vertical}
+button{cursor:pointer;background:linear-gradient(180deg,#e8f0ff,#dbeafe);border:1px solid rgba(29,116,245,.35)}
+button:hover{filter:brightness(1.08)}
+.btn2{background:linear-gradient(180deg,#eaf7ef,#d1fadf);border-color:rgba(31,157,85,.35)}
+.btn3{background:linear-gradient(180deg,#ffecec,#ffd6d6);border-color:rgba(217,45,32,.35)}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(15,23,42,.04);font-size:12px}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.ok{background:var(--ok)}
+.dot.warn{background:var(--warn)}
+.dot.bad{background:var(--bad)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{padding:10px;border-radius:12px;border:1px solid var(--line);background:rgba(15,23,42,.03)}
+.kpi b{font-size:18px}
+.small{font-size:12px;color:var(--muted)}
+.table-wrap{overflow:auto;max-height:68vh;border-top:1px solid var(--line)}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1400px}
+thead th{
+  position:sticky;top:0;z-index:2;
+  background:#f1f5f9;
+  color:var(--muted);
+  text-align:left;
+  padding:10px 10px;
+  border-bottom:1px solid var(--line);
+  font-size:12px;
+  white-space:nowrap;
+}
+tbody td{
+  padding:9px 10px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  vertical-align:top;
+}
+tbody tr:hover{background:rgba(29,116,245,.06)}
+tr.ok{background:rgba(31,157,85,.06)}
+tr.revisar{background:rgba(217,45,32,.09)}
+tr.warn{background:rgba(197,139,0,.08)}
+.mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12px}
+.tag{display:inline-flex;padding:3px 8px;border-radius:999px;border:1px solid var(--line);font-size:11px}
+.tag.ok{border-color:rgba(46,204,113,.35);color:var(--ok)}
+.tag.bad{border-color:rgba(231,76,60,.35);color:#ffb2aa}
+.tag.warn{border-color:rgba(241,196,15,.35);color:#ffe08a}
+.right{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.hr{height:1px;background:var(--line);margin:10px 0}
+.note{color:var(--muted);font-size:12px}
+kbd{background:rgba(15,23,42,.05);border:1px solid rgba(15,23,42,.12);padding:2px 6px;border-radius:8px}
+.pill{display:inline-flex;gap:8px;align-items:center}
+
+
+/* ===== BI (Dashboard) ===== */
+.charts{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+@media (max-width:900px){.charts{grid-template-columns:1fr}}
+.chart-box{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(15,23,42,.02);
+  padding:10px;
+}
+.chart-box h3{
+  margin:0 0 8px;
+  font-size:12px;
+  color:var(--muted);
+  font-weight:600;
+}
+.canvas-wrap{height:220px}
+.canvas-wrap canvas{width:100%!important;height:220px!important}
+
+/* ===== Botão PDF ===== */
+.btnPdf{
+  background:linear-gradient(180deg,#eef4ff,#dbeafe);
+  border:1px solid rgba(29,116,245,.35);
+}
+.btnStack{display:grid;gap:10px}
+
+/* ===== Performance UX ===== */
+.busy{
+  position:fixed; inset:0;
+  background:rgba(255,255,255,.65);
+  display:none; align-items:center; justify-content:center;
+  z-index:9999;
+  backdrop-filter: blur(2px);
+}
+.busy .box{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:14px;
+  box-shadow:0 10px 30px var(--shadow);
+  padding:14px 16px;
+  min-width:260px;
+  display:flex; gap:10px; align-items:center;
+}
+.spinner{
+  width:18px;height:18px;border-radius:50%;
+  border:3px solid rgba(29,116,245,.25);
+  border-top-color: var(--blue);
+  animation:spin .9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== Dashboard Filtros (espelho) ===== */
+.dash-filters{
+  margin-top:10px;
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 2fr;
+  gap:10px;
+  align-items:end;
+}
+@media (max-width:1200px){.dash-filters{grid-template-columns:1fr 1fr}}
+.dash-filters .mini-btns{display:flex;gap:10px}
+.dash-filters .mini-btns button{padding:10px}
+
+</style>
+</head>
+<body>
+<div class="busy" id="busy"><div class="box"><div class="spinner"></div><div><b id="busyTitle">Processando…</b><div class="small" id="busySub">Aguarde</div></div></div></div>
+<header>
+  <h1>⚙️ <span style="color:#d92d20">NAZA MINA</span> | Auditoria de Logs</h1>
+  <div class="sub">
+    Análise de justificativas e divergências em tempo real. Importar planilhas → Auditoria automática → Padronização → Banco local (IndexedDB) → Export Excel.
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="card">
+      <h2>1) Importação de Dados</h2>
+      <div class="body row1">
+        <div>
+          <label>Importar Excel (.xlsx) - mesmo cabeçalho</label>
+          <input id="file" type="file" accept=".xlsx,.xls"/>
+        </div>
+
+        <div>
+          <label>Ou cole aqui (CTRL+V) - formato: Área | Data de Consolid. | Data do Log | Usuário | Tipo de Log | Local de Instalação | Justificativa | Detalhes</label>
+          <textarea id="paste" placeholder="Cole aqui os dados..."></textarea>
+          <div class="note">Dica: copie do Excel (com cabeçalho) e cole. Suporta TAB, CSV.</div>
+        </div>
+
+        <div class="row3">
+          <div>
+            <label>Modo de carga</label>
+            <select id="mode">
+              <option value="append">➕ Adicionar ao banco</option>
+              <option value="replace">🔄 Substituir visão atual</option>
+              <option value="clear_and_append">🗑️ Limpar banco e carregar</option>
+            </select>
+          </div>
+          <div>
+            <label>Fonte / Lote (opcional)</label>
+            <input id="batch" placeholder="ex.: 2026-02-28 Turno A"/>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button id="btnProcess" class="btn2">⚙️ Processar e Auditar</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div><button id="btnViewCurrent" class="btn2">📋 Ver somente Lote Atual</button></div>
+          <div><button id="btnViewBank">🗃️ Ver Banco Completo</button></div>
+        </div>
+
+        <div class="row">
+          <div><button id="btnLoadDB">📥 Carregar Banco (IndexedDB)</button></div>
+          <div><button id="btnClearDB" class="btn3">🧹 Limpar Banco</button></div>
+        </div>
+
+        <div class="row">
+          <div><button id="btnSaveDB" class="btn2">💾 Salvar visão no Banco</button></div>
+          <div class="btnStack">
+            <button id="btnExportPDF" class="btnPdf">🧾 Exportar PDF (Relatório)</button>
+            <button id="btnExportXLSX">📥 Exportar Excel (Auditoria)</button>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="note">
+          <b>Banco local:</b> IndexedDB (navegador). Fluxo diário: <kbd>Importar/Colar</kbd> → <kbd>Processar</kbd> → (opcional) <kbd>Salvar no Banco</kbd> → <kbd>Filtrar</kbd> → <kbd>Exportar</kbd>.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2) Filtros & Padronização</h2>
+      <div class="body">
+        <div class="row">
+          <div>
+            <label>Área</label>
+            <select id="fArea"></select>
+          </div>
+          <div>
+            <label>Tipo de Log</label>
+            <select id="fTipo"></select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Status</label>
+            <select id="fStatus">
+              <option value="">Todos</option>
+              <option value="OK">✅ OK</option>
+              <option value="REVISAR">❌ REVISAR</option>
+            </select>
+          </div>
+          <div>
+            <label>Usuário</label>
+            <select id="fUsuario"></select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Pesquisar (equipamento, justificativa, detalhes...)</label>
+            <input id="fText" placeholder="ex.: 02CV002, anti-rasgo, velocidade..."/>
+          </div>
+          <div>
+            <label>Score mínimo</label>
+            <select id="fScore">
+              <option value="">Todos</option>
+              <option value="1">≥ 1</option>
+              <option value="2">≥ 2</option>
+              <option value="3">≥ 3</option>
+              <option value="4">≥ 4</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="row">
+          <div>
+            <label>Justificativas Padrão (MES-ANALISADOR3MIX)</label>
+            <select id="pickJust"></select>
+          </div>
+          <div>
+            <label>Aplicar na linha selecionada</label>
+            <button id="btnApplyJust" class="btn2">✅ Aplicar</button>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:10px">
+          • Clique em uma linha para <b>selecionar</b>.<br>
+          • A coluna "Justificativa Padrão" mostra a sugestão do sistema.<br>
+          • Divergências explicam por que o item precisa de revisão.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:12px"></div>
+
+  <div class="card">
+    <h2>3) Dashboard - Análise de Divergências (MES-ANALISADOR3MIX)</h2>
+    <div class="body">
+      <div class="kpis">
+        <div class="kpi"><div class="small">Total (visão filtrada)</div><b id="kTotal">0</b></div>
+        <div class="kpi"><div class="small">REVISAR</div><b id="kRev">0</b></div>
+        <div class="kpi"><div class="small">Sem justificativa</div><b id="kSemJ">0</b></div>
+        <div class="kpi"><div class="small">% REVISAR</div><b id="kPerc">0%</b></div>
+      </div>
+
+      
+<div class="hr"></div>
+
+      <!-- Filtros rápidos (espelho do Banco) -->
+      <div class="dash-filters">
+        <div>
+          <label>Área (Dashboard)</label>
+          <select id="dArea"></select>
+        </div>
+        <div>
+          <label>Tipo de Log (Dashboard)</label>
+          <select id="dTipo"></select>
+        </div>
+        <div>
+          <label>Status (Dashboard)</label>
+          <select id="dStatus">
+            <option value="">Todos</option>
+            <option value="OK">✅ OK</option>
+            <option value="REVISAR">❌ REVISAR</option>
+          </select>
+        </div>
+        <div>
+          <label>Usuário (Dashboard)</label>
+          <select id="dUsuario"></select>
+        </div>
+        <div>
+          <label>Score mínimo (Dashboard)</label>
+          <select id="dScore">
+            <option value="">Todos</option>
+            <option value="1">≥ 1</option>
+            <option value="2">≥ 2</option>
+            <option value="3">≥ 3</option>
+            <option value="4">≥ 4</option>
+          </select>
+        </div>
+        <div>
+          <label>Pesquisar (Dashboard)</label>
+          <div class="mini-btns">
+            <input id="dText" placeholder="ex.: 02CV002, anti-rasgo, velocidade..."/>
+            <button id="btnClearDash" class="btn3" type="button">🧹 Limpar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="right">
+
+        <div class="pill">
+          <span class="badge"><span class="dot ok"></span>OK</span>
+          <span class="badge"><span class="dot warn"></span>Score 1-2</span>
+          <span class="badge"><span class="dot bad"></span>REVISAR (score ≥3)</span>
+        </div>
+        <span class="badge">Linha selecionada: <b id="selInfo">nenhuma</b></span>
+      </div>
+    </div>
+
+      <div class="charts" id="biArea">
+        <div class="chart-box">
+          <h3>📊 Status (OK x REVISAR)</h3>
+          <div class="canvas-wrap"><canvas id="chartStatus"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <h3>🏷️ Top Divergências (visão filtrada)</h3>
+          <div class="canvas-wrap"><canvas id="chartDiverg"></canvas></div>
+        </div>
+      </div>
+
+
+    <div class="table-wrap">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Área</th>
+            <th>Data Log</th>
+            <th>Usuário</th>
+            <th>Tipo de Log</th>
+            <th>Local/Equip.</th>
+            <th>Justificativa Original</th>
+            <th>Divergências</th>
+            <th>Justificativa Padrão (J001-J010)</th>
+            <th>Detalhes</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   CONSTANTES E CONFIGURAÇÕES (MES-ANALISADOR3MIX)
+========================= */
+const JUSTIFICATIVAS_PADRAO = [
+    'J001 - Ajuste de horário (início/fim corrigidos)',
+    'J002 - Reclassificação (tipo/motivo/descrição)',
+    'J003 - Ajuste de componente / equipamento',
+    'J004 - Exclusão por duplicidade',
+    'J005 - Lançamento indevido / não ocorreu',
+    'J006 - Detalhamento técnico',
+    'J007 - Intervalo de basculamento',
+    'J008 - Erro de sistema/MES',
+    'J009 - Ajuste de parada (justificativa)',
+    'J010 - Outros (detalhar no campo)'
+];
+
+/* =========================
+   Banco (IndexedDB)
+========================= */
+const DB_NAME = "NAZA_AUDITORIA_DB_V6";
+const DB_VER = 1;
+const STORE = "rows";
+
+function idbOpen(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = (e)=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(STORE)){
+        db.createObjectStore(STORE, {keyPath: "_id"});
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbPutAll(rows){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE, "readwrite");
+    const st = tx.objectStore(STORE);
+    rows.forEach(r => st.put(r));
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function idbGetAll(){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE, "readonly");
+    const st = tx.objectStore(STORE);
+    const req = st.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbClear(){
+  const db = await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE, "readwrite");
+    const st = tx.objectStore(STORE);
+    const req = st.clear();
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* =========================
+   FUNÇÕES DE AUDITORIA (MES-ANALISADOR3MIX - VERSÃO CORRETA)
+========================= */
+function normalizarTexto(texto) {
+    if (!texto) return '';
+    return String(texto).replace(/\s+/g, ' ').trim();
+}
+
+function isJustificativaVazia(just) {
+    just = normalizarTexto(just);
+    return !just || just === '.' || just === '' || just === '..' || just === '. ' || just === ',';
+}
+
+function auditarRegistro(base) {
+    const just = normalizarTexto(base["Justificativa"]);
+    const detalhes = normalizarTexto(base["Detalhes"]);
+    const tipoLog = normalizarTexto(base["Tipo de Log"]);
+    
+    let divergencias = [];
+    let score = 0;
+    let status = 'OK';
+    let categoria = 'Outros';
+    let justPadraoSugerida = '';
+
+    // Análise de justificativa vazia (principal problema)
+    if (isJustificativaVazia(just)) {
+        divergencias.push('Justificativa vazia ou inválida');
+        score += 3;
+    }
+
+    // Análise baseada no tipo de log
+    if (tipoLog.includes('Alteração')) {
+        if (!detalhes) {
+            divergencias.push('Alteração sem detalhes');
+            score += 2;
+        } else if (!detalhes.includes('->') && !detalhes.includes('FIM:')) {
+            divergencias.push('Alteração sem evidência de mudança (->)');
+            score += 1;
+        }
+    } else if (tipoLog.includes('Exclusão')) {
+        if (isJustificativaVazia(just)) {
+            divergencias.push('Exclusão sem justificativa');
+            score += 3;
+        }
+        if (!detalhes) {
+            divergencias.push('Exclusão sem detalhes');
+            score += 1;
+        }
+    }
+
+    // Análise de justificativa genérica
+    if (just.toLowerCase() === 'ok' || just.toLowerCase() === 'ok.') {
+        divergencias.push('Justificativa genérica "OK"');
+        score += 1;
+    }
+
+    // Detectar setas (indica alteração)
+    if (detalhes.includes('->') && !tipoLog.includes('Alteração')) {
+        divergencias.push('Detalhes com -> mas não é Alteração');
+        score += 2;
+    }
+
+    // Categorizar justificativa
+    const justUpper = just.toUpperCase();
+    if (justUpper.includes('HORA') || justUpper.includes('FIM') || justUpper.includes('INÍCIO')) {
+        categoria = 'Ajuste de horário';
+        justPadraoSugerida = 'J001 - Ajuste de horário (início/fim corrigidos)';
+    } else if (justUpper.includes('COMPONENTE') || justUpper.includes('EQUIP')) {
+        categoria = 'Ajuste de componente';
+        justPadraoSugerida = 'J003 - Ajuste de componente / equipamento';
+    } else if (justUpper.includes('TIPO') || justUpper.includes('CLASSIF') || justUpper.includes('MOTIVO')) {
+        categoria = 'Reclassificação';
+        justPadraoSugerida = 'J002 - Reclassificação (tipo/motivo/descrição)';
+    } else if (justUpper.includes('DUPLIC')) {
+        categoria = 'Duplicidade';
+        justPadraoSugerida = 'J004 - Exclusão por duplicidade';
+    } else if (justUpper.includes('INDEVID') || justUpper.includes('NÃO OCORREU')) {
+        categoria = 'Lançamento indevido';
+        justPadraoSugerida = 'J005 - Lançamento indevido / não ocorreu';
+    } else if (justUpper.includes('DETALH')) {
+        categoria = 'Detalhamento';
+        justPadraoSugerida = 'J006 - Detalhamento técnico';
+    } else if (justUpper.includes('SISTEMA') || justUpper.includes('ERRO')) {
+        categoria = 'Erro de sistema';
+        justPadraoSugerida = 'J008 - Erro de sistema/MES';
+    } else if (just && !isJustificativaVazia(just)) {
+        categoria = 'Outros';
+        justPadraoSugerida = 'J010 - Outros (detalhar no campo)';
+    }
+
+    // Se não tem justificativa, sugerir baseado no tipo
+    if (isJustificativaVazia(just)) {
+        if (tipoLog.includes('Exclusão')) {
+            justPadraoSugerida = 'J004 - Exclusão por duplicidade';
+        } else if (tipoLog.includes('Alteração')) {
+            justPadraoSugerida = 'J009 - Ajuste de parada (justificativa)';
+        } else {
+            justPadraoSugerida = 'J006 - Detalhamento técnico';
+        }
+    }
+
+    // Determinar status baseado no score
+    if (score >= 2) {
+        status = 'REVISAR';
+    } else if (score > 0) {
+        status = 'REVISAR'; // Qualquer score > 0 merece revisão
+    }
+
+    return {
+        Status: status,
+        Score: score,
+        Divergencias: divergencias.length ? divergencias.join('; ') : 'OK',
+        Categoria: categoria,
+        JustPadSug: justPadraoSugerida
+    };
+}
+
+/* =========================
+   App State
+========================= */
+let RAW = [];      // visão atual exibida
+let BANK = [];     // banco completo (IndexedDB)
+let CURRENT = [];  // último lote importado/colado
+let VIEW = [];
+let selectedId = null;
+let LAST_BATCH = "";
+
+const $ = sel => document.querySelector(sel);
+function setBusy(on, title="Processando…", sub="Aguarde"){
+  const el = $("#busy");
+  if(!el) return;
+  $("#busyTitle").textContent = title;
+  $("#busySub").textContent = sub;
+  el.style.display = on ? "flex" : "none";
+}
+
+function opt(sel, val, txt){
+  const o = document.createElement("option");
+  o.value = val; o.textContent = txt;
+  sel.appendChild(o);
+}
+
+function setSelectOptions(sel, values){
+  sel.innerHTML = "";
+  opt(sel, "", "Todos");
+  values.forEach(v => opt(sel, v, v));
+}
+
+function uniqueFast(arr, doSort=true){
+  const seen = new Set();
+  const out = [];
+  for(const v0 of arr){
+    const v = normalizarTexto(v0);
+    if(!v) continue;
+    if(!seen.has(v)){ seen.add(v); out.push(v); }
+  }
+  if(doSort && out.length <= 2000){ out.sort((a,b) => a.localeCompare(b,'pt-BR')); }
+  return out;
+}
+
+function hydrateFilters(){
+  setSelectOptions($("#fArea"), uniqueFast(RAW.map(r => r._AreaN)));
+  setSelectOptions($("#fTipo"), uniqueFast(RAW.map(r => r._TipoN)));
+  setSelectOptions($("#fUsuario"), uniqueFast(RAW.map(r => r._UsuarioN)));
+  $("#pickJust").innerHTML = "";
+  JUSTIFICATIVAS_PADRAO.forEach(v => opt($("#pickJust"), v, v));
+  syncDashFiltersFromMain();
+}
+
+
+function syncDashFiltersFromMain(){
+  const dArea = $("#dArea"), dTipo = $("#dTipo"), dUsuario = $("#dUsuario");
+  if(!dArea || !dTipo || !dUsuario) return;
+
+  // espelha opções dos filtros principais
+  dArea.innerHTML = $("#fArea").innerHTML;
+  dTipo.innerHTML = $("#fTipo").innerHTML;
+  dUsuario.innerHTML = $("#fUsuario").innerHTML;
+
+  // espelha valores
+  dArea.value = $("#fArea").value;
+  dTipo.value = $("#fTipo").value;
+  $("#dStatus").value = $("#fStatus").value;
+  dUsuario.value = $("#fUsuario").value;
+  $("#dScore").value = $("#fScore").value;
+  $("#dText").value = $("#fText").value;
+}
+
+function setScope(scope){
+  if(scope === "bank"){
+    RAW = (BANK && BANK.length) ? BANK.slice() : RAW;
+  }else{
+    RAW = (CURRENT && CURRENT.length) ? CURRENT.slice() : RAW;
+  }
+  hydrateFilters();
+  applyFilters({preserve: false});
+}
+
+function applyFilters(opts={}){
+  const preserve = opts.preserve !== false;
+  const fArea = $("#fArea").value;
+  const fTipo = $("#fTipo").value;
+  const fStatus = $("#fStatus").value;
+  const fUsuario = $("#fUsuario").value;
+  const fText = normalizarTexto($("#fText").value).toLowerCase();
+  const fScore = $("#fScore").value ? Number($("#fScore").value) : null;
+
+  VIEW = RAW.filter(r => {
+    if(fArea && r._AreaN !== fArea) return false;
+    if(fTipo && r._TipoN !== fTipo) return false;
+    if(fStatus && r.Status !== fStatus) return false;
+    if(fUsuario && r._UsuarioN !== fUsuario) return false;
+    if(fScore !== null && Number(r.Score) < fScore) return false;
+    if(fText && !r._blob.includes(fText)) return false;
+    return true;
+  });
+
+  if(preserve){
+    refreshDependentFilterOptions();
+  }
+
+  renderTable();
+  renderKpis();
+  renderCharts();
+  syncDashFiltersFromMain();
+}
+
+let _suppressFilterEvents = false;
+function refreshDependentFilterOptions(){
+  const fArea = $("#fArea").value;
+  const fTipo = $("#fTipo").value;
+  const fStatus = $("#fStatus").value;
+  const fUsuario = $("#fUsuario").value;
+  const fText = normalizarTexto($("#fText").value).toLowerCase();
+  const fScore = $("#fScore").value ? Number($("#fScore").value) : null;
+
+  function subset(except){
+    return RAW.filter(r => {
+      if(except !== "area" && fArea && r._AreaN !== fArea) return false;
+      if(except !== "tipo" && fTipo && r._TipoN !== fTipo) return false;
+      if(except !== "status" && fStatus && r.Status !== fStatus) return false;
+      if(except !== "usuario" && fUsuario && r._UsuarioN !== fUsuario) return false;
+      if(fScore !== null && Number(r.Score) < fScore) return false;
+      if(fText && !r._blob.includes(fText)) return false;
+      return true;
+    });
+  }
+
+  const keep = {
+    area: $("#fArea").value,
+    tipo: $("#fTipo").value,
+    usuario: $("#fUsuario").value
+  };
+
+  _suppressFilterEvents = true;
+
+  const sArea = subset("area");
+  setSelectOptions($("#fArea"), uniqueFast(sArea.map(r => r._AreaN), true));
+  if(keep.area && [...$("#fArea").options].some(o => o.value === keep.area)) $("#fArea").value = keep.area;
+
+  const sTipo = subset("tipo");
+  setSelectOptions($("#fTipo"), uniqueFast(sTipo.map(r => r._TipoN), true));
+  if(keep.tipo && [...$("#fTipo").options].some(o => o.value === keep.tipo)) $("#fTipo").value = keep.tipo;
+
+  const sUsu = subset("usuario");
+  setSelectOptions($("#fUsuario"), uniqueFast(sUsu.map(r => r._UsuarioN), true));
+  if(keep.usuario && [...$("#fUsuario").options].some(o => o.value === keep.usuario)) $("#fUsuario").value = keep.usuario;
+
+  _suppressFilterEvents = false;
+}
+
+function badgeStatus(r){
+  if(r.Status === "OK") return `<span class="tag ok">✅ OK</span>`;
+  if(Number(r.Score) >= 3) return `<span class="tag bad">❌ REVISAR</span>`;
+  return `<span class="tag warn">⚠️ REVISAR</span>`;
+}
+
+function rowClass(r){
+  if(r.Status === "OK") return "ok";
+  if(Number(r.Score) >= 3) return "revisar";
+  return "warn";
+}
+
+function renderTable(){
+  const tb = $("#tbl tbody");
+  tb.innerHTML = "";
+  
+  VIEW.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    tr.className = rowClass(r);
+    tr.dataset.id = r._id;
+    
+    tr.innerHTML = `
+      <td class="mono">${idx+1}</td>
+      <td>${badgeStatus(r)}</td>
+      <td class="mono"><span class="tag">${r.Score || 0}</span></td>
+      <td>${normalizarTexto(r["Área"])}</td>
+      <td class="mono">${normalizarTexto(r["Data do Log"])}</td>
+      <td class="mono">${normalizarTexto(r["Usuário"])}</td>
+      <td>${normalizarTexto(r["Tipo de Log"])}</td>
+      <td class="mono">${normalizarTexto(r["Local de Instalação"])}</td>
+      <td>${r._missingJust ? '⚪ (vazio)' : normalizarTexto(r["Justificativa"])}</td>
+      <td style="color: ${r.Divergencias !== 'OK' ? '#d92d20' : '#1f9d55'}; max-width: 250px;">
+        ${r.Divergencias}
+      </td>
+      <td>
+        <select data-just="1" style="width: 220px; padding: 4px; border: 1px solid var(--line); border-radius: 6px;">
+          ${JUSTIFICATIVAS_PADRAO.map(v => `<option value="${v}" ${r.JustificativaPadronizada === v ? "selected" : ""}>${v}</option>`).join("")}
+        </select>
+      </td>
+      <td class="mono" style="max-width: 200px;" title="${normalizarTexto(r["Detalhes"])}">
+        ${normalizarTexto(r["Detalhes"]).slice(0, 60)}${normalizarTexto(r["Detalhes"]).length > 60 ? "…" : ""}
+      </td>
+    `;
+    
+    tr.addEventListener("click", (e) => {
+      selectedId = r._id;
+      $("#selInfo").textContent = String(r._id);
+      if(e.target && e.target.matches("select[data-just]")) e.stopPropagation();
+      [...tb.querySelectorAll("tr")].forEach(x => x.style.outline = "none");
+      tr.style.outline = "2px solid #d92d20";
+      tr.style.outlineOffset = "-2px";
+    });
+    
+    tr.querySelector('select[data-just]').addEventListener("change", (e) => {
+      r.JustificativaPadronizada = e.target.value;
+      selectedId = r._id;
+      $("#selInfo").textContent = String(r._id);
+    });
+    
+    tb.appendChild(tr);
+  });
+}
+
+function renderKpis(){
+  const total = VIEW.length;
+  const revisar = VIEW.filter(r => r.Status === "REVISAR").length;
+  const semJ = VIEW.filter(r => r._missingJust).length;
+  $("#kTotal").textContent = total;
+  $("#kRev").textContent = revisar;
+  $("#kSemJ").textContent = semJ;
+  $("#kPerc").textContent = total ? Math.round((revisar/total)*100) + "%" : "0%";
+}
+
+
+/* =========================
+   BI (Gráficos do Dashboard)
+========================= */
+let _chartStatus = null;
+let _chartDiverg = null;
+
+function destroyChart(ch){ try{ ch && ch.destroy && ch.destroy(); }catch(e){} }
+
+function topCounts(items, keyFn, topN=8){
+  const map = new Map();
+  for(const it of items){
+    const k = normalizarTexto(keyFn(it)) || "(vazio)";
+    map.set(k, (map.get(k)||0)+1);
+  }
+  const arr = Array.from(map.entries()).sort((a,b)=>b[1]-a[1]);
+  return arr.slice(0, topN);
+}
+
+function renderCharts(){
+  const el1 = document.getElementById("chartStatus");
+  const el2 = document.getElementById("chartDiverg");
+  if(!el1 || !el2) return;
+
+  const ok = VIEW.filter(r => r.Status === "OK").length;
+  const rev = VIEW.filter(r => r.Status === "REVISAR").length;
+
+  const topDiv = topCounts(VIEW, r => {
+    const d = normalizarTexto(r.Divergencias);
+    if(!d || d === "OK") return "OK";
+    // usa o primeiro item antes do ';' para ficar limpo
+    return d.split(";")[0].trim();
+  }, 10);
+
+  const labelsDiv = topDiv.map(x => x[0]);
+  const dataDiv = topDiv.map(x => x[1]);
+
+  destroyChart(_chartStatus);
+  destroyChart(_chartDiverg);
+
+  _chartStatus = new Chart(el1, {
+    type: "doughnut",
+    data: {
+      labels: ["OK", "REVISAR"],
+      datasets: [{ data: [ok, rev] }]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:"bottom" }
+      }
+    }
+  });
+
+  _chartDiverg = new Chart(el2, {
+    type: "bar",
+    data: {
+      labels: labelsDiv,
+      datasets: [{ label: "Qtd", data: dataDiv }]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ autoSkip:false, maxRotation:40, minRotation:0 } },
+        y:{ beginAtZero:true, ticks:{ precision:0 } }
+      }
+    }
+  });
+}
+
+/* =========================
+   PDF (Relatório Gerencial)
+========================= */
+function nowBR(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function getFiltersSummary(){
+  const parts = [];
+  const map = [
+    ["Área", "#fArea"],
+    ["Tipo", "#fTipo"],
+    ["Status", "#fStatus"],
+    ["Usuário", "#fUsuario"],
+    ["Score ≥", "#fScore"]
+  ];
+  map.forEach(([label, sel])=>{
+    const el = $(sel);
+    if(!el) return;
+    const v = normalizarTexto(el.value);
+    if(v) parts.push(`${label}: ${v}`);
+  });
+  const t = normalizarTexto($("#fText").value);
+  if(t) parts.push(`Busca: ${t}`);
+  return parts.length ? parts.join(" | ") : "Sem filtros (visão completa)";
+}
+
+function safeSplit(doc, text, w){
+  const t = normalizarTexto(text);
+  if(!t) return [""];
+  return doc.splitTextToSize(t, w);
+}
+
+function exportPDF(){
+  if(!RAW.length){ alert("Nenhum dado carregado."); return; }
+
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("Biblioteca de PDF não carregou. Verifique sua internet e recarregue o HTML."); return; }
+
+  const doc = new jsPDF({orientation:"landscape", unit:"mm", format:"a4"});
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 10;
+
+  const title = "NAZA MINA | Auditoria de Logs";
+  const subtitle = `Gerado em: ${nowBR()}   •   Lote atual: ${normalizarTexto(LAST_BATCH)||"(não informado)"}   •   Visão: ${RAW===BANK? "Banco completo":"Lote atual/visão atual"}`;
+
+  // ===== Capa / Resumo =====
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(14);
+  doc.text(title, margin, 12);
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9);
+  doc.text(subtitle, margin, 18);
+
+  doc.setFontSize(9);
+  doc.text(`Filtros: ${getFiltersSummary()}`, margin, 23);
+
+  // KPIs
+  const total = VIEW.length;
+  const revisar = VIEW.filter(r => r.Status === "REVISAR").length;
+  const semJ = VIEW.filter(r => r._missingJust).length;
+  const perc = total ? Math.round((revisar/total)*100) + "%" : "0%";
+
+  const kY = 32;
+  const boxH = 16;
+  const gap = 4;
+  const boxW = (pageW - margin*2 - gap*3) / 4;
+
+  const kpis = [
+    ["Total (visão filtrada)", String(total)],
+    ["REVISAR", String(revisar)],
+    ["Sem justificativa", String(semJ)],
+    ["% REVISAR", String(perc)]
+  ];
+
+  doc.setDrawColor(210);
+
+  kpis.forEach((k, i)=>{
+    const x = margin + i*(boxW+gap);
+    doc.setFillColor(255,255,255);
+    doc.setDrawColor(210);
+    doc.roundedRect(x, kY, boxW, boxH, 2, 2, "FD");
+    doc.setFontSize(8);
+    doc.setTextColor(80);
+    doc.text(k[0], x+3, kY+6);
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15);
+    doc.text(k[1], x+3, kY+14);
+    doc.setFont("helvetica","normal");
+  });
+
+  // Gráficos (imagens)
+  let y = kY + boxH + 6;
+
+  function addCanvasToPdf(canvasId, x, y, w, h){
+    const c = document.getElementById(canvasId);
+    if(!c) return false;
+    try{
+      const img = c.toDataURL("image/png", 1.0);
+      doc.addImage(img, "PNG", x, y, w, h, undefined, "FAST");
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  // caixas de gráficos
+  const chartH = 55;
+  const chartW = (pageW - margin*2 - 6) / 2;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(10);
+  doc.setTextColor(15);
+  doc.text("BI do Dashboard (visão filtrada)", margin, y-2);
+  doc.setFont("helvetica","normal");
+
+  doc.setDrawColor(220);
+  doc.roundedRect(margin, y, chartW, chartH, 2, 2);
+  doc.roundedRect(margin+chartW+6, y, chartW, chartH, 2, 2);
+  addCanvasToPdf("chartStatus", margin+2, y+3, chartW-4, chartH-6);
+  addCanvasToPdf("chartDiverg", margin+chartW+8, y+3, chartW-4, chartH-6);
+
+  // ===== Tabela (paginação) =====
+  doc.addPage();
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(12);
+  doc.text("Tabela de Auditoria (visão filtrada)", margin, 12);
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9);
+  doc.text(`Filtros: ${getFiltersSummary()}`, margin, 17);
+
+  // Definição de colunas (A4 landscape)
+  const cols = [
+    {key:"#", label:"#", w:8},
+    {key:"Status", label:"Status", w:18},
+    {key:"Score", label:"Score", w:10},
+    {key:"Área", label:"Área", w:18},
+    {key:"Data do Log", label:"Data Log", w:22},
+    {key:"Usuário", label:"Usuário", w:16},
+    {key:"Tipo de Log", label:"Tipo de Log", w:40},
+    {key:"Local", label:"Local/Equip.", w:20},
+    {key:"Just", label:"Justificativa", w:28},
+    {key:"Div", label:"Divergências", w:32},
+    {key:"Pad", label:"Just Padrão", w:34},
+    {key:"Det", label:"Detalhes", w:46},
+  ];
+
+  // Ajusta proporcionalmente para caber na página
+  const avail = pageW - margin*2;
+  const sumW = cols.reduce((s,c)=>s+c.w,0);
+  const scale = avail / sumW;
+  cols.forEach(c => c.w = c.w * scale);
+
+  const lineH = 4.0;
+  let cursorY = 24;
+
+  function drawHeader(){
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(8);
+    doc.setFillColor(241,245,249);
+    let x = margin;
+    const h = 7;
+    cols.forEach(c=>{
+      doc.rect(x, cursorY, c.w, h, "F");
+      doc.setTextColor(80);
+      doc.text(c.label, x+1.5, cursorY+4.8);
+      x += c.w;
+    });
+    doc.setFont("helvetica","normal");
+    doc.setTextColor(15);
+    cursorY += h + 1;
+  }
+
+  function newPage(){
+    doc.addPage();
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(12);
+    doc.text("Tabela de Auditoria (continuação)", margin, 12);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(9);
+    doc.text(`Filtros: ${getFiltersSummary()}`, margin, 17);
+    cursorY = 24;
+    drawHeader();
+  }
+
+  drawHeader();
+
+  doc.setFontSize(7.3);
+
+  const rows = VIEW.map((r, idx)=>({
+    "#": String(idx+1),
+    "Status": r.Status === "OK" ? "OK" : "REVISAR",
+    "Score": String(r.Score||0),
+    "Área": normalizarTexto(r["Área"]),
+    "Data do Log": normalizarTexto(r["Data do Log"]),
+    "Usuário": normalizarTexto(r["Usuário"]),
+    "Tipo de Log": normalizarTexto(r["Tipo de Log"]),
+    "Local": normalizarTexto(r["Local de Instalação"]),
+    "Just": r._missingJust ? "(vazio)" : normalizarTexto(r["Justificativa"]),
+    "Div": normalizarTexto(r.Divergencias),
+    "Pad": normalizarTexto(r.JustificativaPadronizada || r.JustPadSug),
+    "Det": normalizarTexto(r["Detalhes"])
+  }));
+
+  for(const rr of rows){
+    // calcula altura da linha com base no maior wrap
+    const cells = cols.map(c=>{
+      const val = rr[c.key] ?? "";
+      const lines = safeSplit(doc, val, c.w-3);
+      return {lines};
+    });
+    const maxLines = Math.max(1, ...cells.map(c=>c.lines.length));
+    const rowH = maxLines * lineH + 2;
+
+    if(cursorY + rowH > pageH - margin){
+      newPage();
+    }
+
+    // fundo leve alternado
+    // (mantém simples, não depende de cor por status)
+    doc.setDrawColor(235);
+    let x = margin;
+    cols.forEach((c, ci)=>{
+      doc.rect(x, cursorY, c.w, rowH);
+      const lines = cells[ci].lines;
+      let ty = cursorY + 4;
+      for(let li=0; li<lines.length; li++){
+        if(li > 6) break; // evita linhas gigantes
+        doc.text(String(lines[li]), x+1.5, ty);
+        ty += lineH;
+      }
+      x += c.w;
+    });
+
+    cursorY += rowH;
+  }
+
+  doc.save(`NAZA_Auditoria_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+/* =========================
+   Import / Paste / Export
+========================= */
+function xlsxDateToISO(v){
+  if(v instanceof Date) return v.toISOString().slice(0,19).replace("T", " ");
+  return normalizarTexto(v);
+}
+
+function buildId(base, idx){
+  return [
+    normalizarTexto(base["Área"]),
+    normalizarTexto(base["Data do Log"]),
+    normalizarTexto(base["Usuário"]),
+    normalizarTexto(base["Tipo de Log"]),
+    normalizarTexto(base["Local de Instalação"]),
+    String(idx)
+  ].join("|");
+}
+
+function importXLSX(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type: "array", cellDates: true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, {defval: ""});
+        resolve(json);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parsePasted(text){
+  text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if(!text) return [];
+  const lines = text.split("\n").filter(l => l.trim() !== "");
+  if(lines.length < 2) return [];
+  const delim = lines[0].includes("\t") ? "\t" : (lines[0].includes(";") ? ";" : ",");
+  const header = lines[0].split(delim).map(h => normalizarTexto(h));
+  const rows = [];
+  for(let i=1; i<lines.length; i++){
+    const cells = lines[i].split(delim);
+    const obj = {};
+    header.forEach((h, idx) => obj[h] = normalizarTexto(cells[idx] ?? ""));
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function mapRow(r){
+  const base = {
+    "Área": normalizarTexto(r["Área"] ?? r["AREA"] ?? r["Area"]),
+    "Data de Consolid.": xlsxDateToISO(r["Data de Consolid."] ?? r["Data de Consolid"] ?? r["Data de Consolidacao"] ?? r["Data de Consolidação"]),
+    "Data do Log": xlsxDateToISO(r["Data do Log"] ?? r["Data Log"] ?? r["Data"]),
+    "Usuário": normalizarTexto(r["Usuário"] ?? r["Usuario"] ?? r["User"]),
+    "Tipo de Log": normalizarTexto(r["Tipo de Log"] ?? r["Tipo Log"] ?? r["Tipo"]),
+    "Local de Instalação": normalizarTexto(r["Local de Instalação"] ?? r["Local de Instalacao"] ?? r["Local"]),
+    "Justificativa": normalizarTexto(r["Justificativa"] ?? r["Just"]),
+    "Detalhes": normalizarTexto(r["Detalhes"] ?? r["Detalhe"] ?? r["Detalhamento"])
+  };
+  return base;
+}
+
+function enrichRow(r){
+  if(!r) return r;
+  if(typeof r._blob === "string" && r._AreaN !== undefined) return r;
+  
+  const _AreaN = normalizarTexto(r["Área"]);
+  const _TipoN = normalizarTexto(r["Tipo de Log"]);
+  const _UsuarioN = normalizarTexto(r["Usuário"]);
+  const _LocalN = normalizarTexto(r["Local de Instalação"]);
+  const _JustN = normalizarTexto(r["Justificativa"]);
+  const _DetN = normalizarTexto(r["Detalhes"]);
+  
+  r._AreaN = _AreaN;
+  r._TipoN = _TipoN;
+  r._UsuarioN = _UsuarioN;
+  r._LocalN = _LocalN;
+  r._JustN = _JustN;
+  r._DetN = _DetN;
+  r._missingJust = isJustificativaVazia(_JustN);
+  r._blob = [
+    normalizarTexto(r["Lote"]), _AreaN, _TipoN, _UsuarioN, _LocalN, _JustN,
+    normalizarTexto(r["Divergencias"]), _DetN, normalizarTexto(r["JustPadSug"]), normalizarTexto(r["JustificativaPadronizada"])
+  ].join(" ").toLowerCase();
+  
+  return r;
+}
+
+async function normalizeImported(rows, lote){
+  const out = [];
+  const total = rows.length;
+  
+  for(let idx=0; idx<rows.length; idx++){
+    const r = rows[idx];
+    const base = mapRow(r);
+    const a = auditarRegistro(base);
+    const _id = buildId(base, idx) + "|" + normalizarTexto(lote);
+
+    const _AreaN = normalizarTexto(base["Área"]);
+    const _TipoN = normalizarTexto(base["Tipo de Log"]);
+    const _UsuarioN = normalizarTexto(base["Usuário"]);
+    const _LocalN = normalizarTexto(base["Local de Instalação"]);
+    const _JustN = normalizarTexto(base["Justificativa"]);
+    const _DetN = normalizarTexto(base["Detalhes"]);
+
+    const rowObj = {
+      _id,
+      "Lote": normalizarTexto(lote),
+      ...base,
+      Status: a.Status,
+      Score: a.Score,
+      Divergencias: a.Divergencias,
+      Categoria: a.Categoria,
+      JustPadSug: a.JustPadSug,
+      JustificativaPadronizada: a.JustPadSug,
+      _AreaN, _TipoN, _UsuarioN, _LocalN, _JustN, _DetN,
+      _missingJust: isJustificativaVazia(_JustN),
+      _blob: [
+        normalizarTexto(lote), _AreaN, _TipoN, _UsuarioN, _LocalN, _JustN,
+        normalizarTexto(a.Divergencias), _DetN, normalizarTexto(a.JustPadSug)
+      ].join(" ").toLowerCase()
+    };
+
+    out.push(rowObj);
+
+    if(idx > 0 && idx % 400 === 0){
+      $("#busySub").textContent = `Processando ${idx}/${total} linhas…`;
+      await new Promise(requestAnimationFrame);
+    }
+  }
+  return out;
+}
+
+function exportXLSX(){
+  const rows = RAW.map(r => ({
+    "Linha": r._id,
+    "Lote": r["Lote"],
+    "Área": r["Área"],
+    "Data Consolid.": r["Data de Consolid."],
+    "Data Log": r["Data do Log"],
+    "Usuário": r["Usuário"],
+    "Tipo de Log": r["Tipo de Log"],
+    "Equipamento": r["Local de Instalação"],
+    "Justificativa Original": r["Justificativa"],
+    "Status": r.Status,
+    "Score": r.Score,
+    "Divergências": r.Divergencias,
+    "Categoria": r.Categoria,
+    "Justificativa Padrão": r.JustPadSug,
+    "Detalhes": r["Detalhes"]
+  }));
+  
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+  XLSX.writeFile(wb, `NAZA_Auditoria_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+/* =========================
+   Fluxo de Processamento
+========================= */
+async function processInput(){
+  const lote = normalizarTexto($("#batch").value) || new Date().toISOString().slice(0,10);
+  const mode = $("#mode").value;
+
+  let rows = [];
+  const file = $("#file").files?.[0];
+
+  const btn = $("#btnProcess");
+  btn.disabled = true;
+  setBusy(true, "Processando Auditoria…", "Lendo dados…");
+
+  try{
+    if(file){
+      rows = await importXLSX(file);
+    }else{
+      rows = parsePasted($("#paste").value);
+    }
+    
+    if(!rows.length){
+      setBusy(false);
+      alert("Nenhum dado encontrado. Importe um Excel ou cole a tabela com cabeçalho.");
+      return;
+    }
+
+    $("#busySub").textContent = "Auditando divergências…";
+    const normalized = await normalizeImported(rows, lote);
+
+    if(mode === "replace"){
+      CURRENT = normalized;
+      LAST_BATCH = lote;
+      RAW = CURRENT.slice();
+      hydrateFilters(); 
+      applyFilters({preserve: false});
+      setBusy(false);
+      alert(`✅ ${normalized.length} registros processados (substituiu a visão atual).`);
+      return;
+    }
+
+    if(mode === "clear_and_append"){
+      await idbClear();
+    }
+
+    $("#busySub").textContent = "Atualizando banco local…";
+    const existing = (await idbGetAll()).map(enrichRow);
+    const merged = [...existing, ...normalized].map(enrichRow);
+    await idbPutAll(merged);
+
+    BANK = merged;
+    CURRENT = normalized;
+    LAST_BATCH = lote;
+
+    RAW = CURRENT.slice();
+    hydrateFilters(); 
+    applyFilters({preserve: false});
+    setBusy(false);
+    alert(`✅ ${normalized.length} registros processados e adicionados ao banco.`);
+  }catch(err){
+    console.error(err);
+    setBusy(false);
+    alert("❌ Erro ao processar: " + (err?.message || err));
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* =========================
+   Event Listeners
+========================= */
+$("#btnProcess").addEventListener("click", () => processInput());
+
+$("#btnViewCurrent").addEventListener("click", () => {
+  if(!CURRENT.length){ alert("Nenhum lote atual. Importe/cole e clique em Processar."); return; }
+  setScope("current");
+});
+
+$("#btnViewBank").addEventListener("click", async () => {
+  if(!BANK.length){
+    BANK = (await idbGetAll()).map(enrichRow);
+  }
+  if(!BANK.length){ alert("Banco vazio."); return; }
+  setScope("bank");
+});
+
+["#fArea", "#fTipo", "#fStatus", "#fUsuario", "#fScore"].forEach(id => {
+  $(id).addEventListener("change", () => { if(_suppressFilterEvents) return; applyFilters(); });
+});
+
+// Filtros do Dashboard (espelho) → alimentam os filtros principais
+["#dArea", "#dTipo", "#dStatus", "#dUsuario", "#dScore"].forEach(id => {
+  const el = $(id);
+  if(!el) return;
+  el.addEventListener("change", () => {
+    if(_suppressFilterEvents) return;
+    $("#fArea").value = $("#dArea").value;
+    $("#fTipo").value = $("#dTipo").value;
+    $("#fStatus").value = $("#dStatus").value;
+    $("#fUsuario").value = $("#dUsuario").value;
+    $("#fScore").value = $("#dScore").value;
+    applyFilters();
+    syncDashFiltersFromMain(); // mantém opções/valores alinhados
+  });
+});
+
+const dTextEl = $("#dText");
+if(dTextEl){
+  dTextEl.addEventListener("input", () => {
+    clearTimeout(window._dt);
+    window._dt = setTimeout(() => {
+      $("#fText").value = $("#dText").value;
+      applyFilters();
+      syncDashFiltersFromMain();
+    }, 180);
+  });
+}
+
+const btnClearDash = $("#btnClearDash");
+if(btnClearDash){
+  btnClearDash.addEventListener("click", () => {
+    $("#fArea").value = "";
+    $("#fTipo").value = "";
+    $("#fStatus").value = "";
+    $("#fUsuario").value = "";
+    $("#fScore").value = "";
+    $("#fText").value = "";
+    applyFilters({preserve:false});
+    hydrateFilters();
+  });
+}
+
+
+$("#fText").addEventListener("input", () => { 
+  clearTimeout(window._t); 
+  window._t = setTimeout(applyFilters, 180); 
+});
+
+$("#btnApplyJust").addEventListener("click", () => {
+  if(!selectedId){ alert("Selecione uma linha primeiro."); return; }
+  const val = $("#pickJust").value;
+  const row = RAW.find(r => r._id === selectedId);
+  if(row){ 
+    row.JustificativaPadronizada = val; 
+    applyFilters(); 
+  }
+});
+
+$("#btnSaveDB").addEventListener("click", async () => {
+  if(!RAW.length){ alert("Nenhum dado carregado."); return; }
+  setBusy(true, "Salvando no banco…", "Atualizando registros…");
+  try{
+    const existing = (await idbGetAll()).map(enrichRow);
+    const byId = new Map();
+    existing.forEach(r => byId.set(r._id, r));
+    RAW.forEach(r => byId.set(r._id, r));
+    const merged = Array.from(byId.values()).map(enrichRow);
+    await idbPutAll(merged);
+    BANK = merged;
+    setBusy(false);
+    alert("✅ Visão salva no banco (IndexedDB).");
+  }catch(err){
+    console.error(err);
+    setBusy(false);
+    alert("❌ Erro ao salvar no banco: " + (err?.message || err));
+  }
+});
+
+$("#btnLoadDB").addEventListener("click", async () => {
+  setBusy(true, "Carregando banco…", "Lendo IndexedDB…");
+  try{
+    const rows = (await idbGetAll()).map(enrichRow);
+    setBusy(false);
+    if(!rows.length){ alert("Banco vazio."); return; }
+    BANK = rows;
+    RAW = BANK.slice();
+    hydrateFilters();
+    applyFilters({preserve: false});
+  }catch(err){
+    console.error(err);
+    setBusy(false);
+    alert("❌ Erro ao carregar banco: " + (err?.message || err));
+  }
+});
+
+$("#btnClearDB").addEventListener("click", async () => {
+  if(confirm("Tem certeza que deseja limpar o banco local (IndexedDB)?")){
+    await idbClear();
+    BANK = [];
+    CURRENT = [];
+    RAW = [];
+    hydrateFilters();
+    applyFilters({preserve: false});
+    alert("✅ Banco limpo.");
+  }
+});
+
+$("#btnExportXLSX").addEventListener("click", () => {
+  if(!RAW.length){ alert("Nenhum dado carregado."); return; }
+  exportXLSX();
+});
+
+$("#btnExportPDF").addEventListener("click", () => {
+  try{ exportPDF(); }catch(err){ console.error(err); alert("❌ Erro ao gerar PDF: " + (err?.message || err)); }
+});
+
+// Inicialização
+(function init(){
+  hydrateFilters();
+  applyFilters({preserve: false});
+})();
+</script>
+</body>
+</html>
