@@ -1519,20 +1519,92 @@ $("#btnExportPDF").addEventListener("click", () => {
 })();
 </script>
   <!-- SENSOR NAZA PORTAL - AUDITORIA -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script>
 (function(){
-  const firebaseConfig={apiKey:"AIzaSyDneReMjO78JqJ-LvmSTiQqUMkxT97H6JE",authDomain:"naza-auditoria-hub.firebaseapp.com",databaseURL:"https://naza-auditoria-hub-default-rtdb.firebaseio.com",projectId:"naza-auditoria-hub"};
-  const app=firebase.apps.length?firebase.app():firebase.initializeApp(firebaseConfig);
-  const db=app.database(); const SISTEMA_ID='auditoria';
-  const num=(id)=>{const el=document.getElementById(id); if(!el) return 0; const m=(el.textContent||'').replace(/\./g,'').replace(',','.').match(/-?\d+(?:\.\d+)?/); return m?Number(m[0]):0;};
-  function coletar(){ const total=num('kTotal'), revisar=num('kRev'), semj=num('kSemJ'), perc=num('kPerc'); return {sistema:SISTEMA_ID,valores:[perc,total,revisar],dadosCompletos:{total,revisar,semJustificativa:semj,percentual:perc},timestamp:Date.now()}; }
-  function enviar(){const payload=coletar(); db.ref('sensores/'+SISTEMA_ID).set(payload).then(()=>console.log('🟢 Sensor Auditoria ativo',payload));}
-  setTimeout(enviar,4000); setInterval(enviar,30000);
-})();
-</script>
+  const sensorFirebaseConfig = {
+    apiKey: "AIzaSyDneReMjO78JqJ-LvmSTiQqUMkxT97H6JE",
+    authDomain: "naza-auditoria-hub.firebaseapp.com",
+    databaseURL: "https://naza-auditoria-hub-default-rtdb.firebaseio.com",
+    projectId: "naza-auditoria-hub"
+  };
 
+  const SENSOR_APP_NAME = 'sensorPortalAuditoria';
+  let sensorApp = null;
+
+  try {
+    sensorApp = firebase.apps.find(app => app.name === SENSOR_APP_NAME) ||
+      firebase.initializeApp(sensorFirebaseConfig, SENSOR_APP_NAME);
+  } catch (e) {
+    console.error('❌ Falha ao iniciar app do sensor Auditoria:', e);
+    return;
+  }
+
+  let db = null;
+  try {
+    db = sensorApp.database();
+  } catch (e) {
+    console.error('❌ Falha ao conectar Realtime Database da Auditoria:', e);
+    return;
+  }
+
+  const SISTEMA_ID = 'auditoria';
+
+  function numText(txt){
+    const m = String(txt || '')
+      .replace(/\./g, '')
+      .replace(',', '.')
+      .match(/-?\d+(?:\.\d+)?/);
+    return m ? Number(m[0]) : 0;
+  }
+
+  function coletar(){
+    let total = 0;
+    let revisar = 0;
+    let semJustificativa = 0;
+    let percRevisar = 0;
+
+    try {
+      total = numText(document.getElementById('kTotal')?.textContent);
+      revisar = numText(document.getElementById('kRev')?.textContent);
+      semJustificativa = numText(document.getElementById('kSemJ')?.textContent);
+      percRevisar = numText(document.getElementById('kPerc')?.textContent);
+
+      if (!percRevisar && total > 0) {
+        percRevisar = (revisar / total) * 100;
+      }
+    } catch (e) {
+      console.warn('Leitura dos indicadores da Auditoria falhou', e);
+    }
+
+    return {
+      sistema: SISTEMA_ID,
+      valores: [
+        Number((percRevisar || 0).toFixed(1)),
+        total || 0,
+        revisar || 0,
+        semJustificativa || 0
+      ],
+      dadosCompletos: {
+        total,
+        revisar,
+        semJustificativa,
+        percRevisar: Number((percRevisar || 0).toFixed(1))
+      },
+      timestamp: Date.now()
+    };
+  }
+
+  function enviar(){
+    const payload = coletar();
+    db.ref('sensores/' + SISTEMA_ID)
+      .set(payload)
+      .then(() => console.log('🟢 Sensor Auditoria ativo', payload))
+      .catch((err) => console.error('❌ Erro ao enviar sensor Auditoria:', err));
+  }
+
+  setTimeout(enviar, 4000);
+  setInterval(enviar, 30000);
+})();
 </script>
 </body>
 </html>
