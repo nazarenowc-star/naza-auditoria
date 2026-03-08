@@ -1518,66 +1518,21 @@ $("#btnExportPDF").addEventListener("click", () => {
   applyFilters({preserve: false});
 })();
 </script>
-  <!-- SENSOR NAZA PORTAL v2 -->
+  <!-- SENSOR NAZA PORTAL - AUDITORIA -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script>
-(function() {
-    const SISTEMA_ID = 'auditoria';
-    const FIREBASE_URL = 'https://firestore.googleapis.com/v1/projects/naza-auditoria-hub/databases/(default)/documents/sensores/' + SISTEMA_ID;
-    
-    function coletarDados() {
-        const texto = document.body.innerText;
-        const numeros = texto.match(/\d+\.?\d*/g) || [];
-        let valores = numeros.slice(0, 3).map(n => parseFloat(n));
-        
-        if (valores.length < 3) {
-            const logs = document.querySelectorAll('.log, .entry, tr').length;
-            const alertas = document.querySelectorAll('.alert, .critical, .high').length;
-            const integridade = document.querySelectorAll('.success, .check').length;
-            valores = [
-                Math.min(100, (integridade / Math.max(1, logs)) * 100) || 96,  // % integridade
-                logs || 8932,  // logs analisados
-                Math.min(100, (alertas * 10)) || 45  // % alertas
-            ];
-        }
-        
-        return valores;
-    }
-    
-    function enviar() {
-        const valores = coletarDados();
-        const payload = {
-            fields: {
-                sistema: { stringValue: SISTEMA_ID },
-                valores: { arrayValue: { values: valores.map(v => ({ doubleValue: v })) } },
-                timestamp: { timestampValue: new Date().toISOString() }
-            }
-        };
-        
-        fetch(FIREBASE_URL, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(() => console.log('✅ Sensor Auditoria:', valores))
-        .catch(() => {});
-        
-        // Log histórico
-        fetch('https://firestore.googleapis.com/v1/projects/naza-auditoria-hub/databases/(default)/documents/sensor_logs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fields: {
-                    sistema: { stringValue: SISTEMA_ID },
-                    valores: { arrayValue: { values: valores.map(v => ({ doubleValue: v })) } },
-                    timestamp: { timestampValue: new Date().toISOString() }
-                }
-            })
-        }).catch(() => {});
-    }
-    
-    setInterval(enviar, 30000);
-    enviar();
-    console.log('🟣 Sensor Auditoria ativo');
+(function(){
+  const firebaseConfig={apiKey:"AIzaSyDneReMjO78JqJ-LvmSTiQqUMkxT97H6JE",authDomain:"naza-auditoria-hub.firebaseapp.com",databaseURL:"https://naza-auditoria-hub-default-rtdb.firebaseio.com",projectId:"naza-auditoria-hub"};
+  const app=firebase.apps.length?firebase.app():firebase.initializeApp(firebaseConfig);
+  const db=app.database(); const SISTEMA_ID='auditoria';
+  const num=(id)=>{const el=document.getElementById(id); if(!el) return 0; const m=(el.textContent||'').replace(/\./g,'').replace(',','.').match(/-?\d+(?:\.\d+)?/); return m?Number(m[0]):0;};
+  function coletar(){ const total=num('kTotal'), revisar=num('kRev'), semj=num('kSemJ'), perc=num('kPerc'); return {sistema:SISTEMA_ID,valores:[perc,total,revisar],dadosCompletos:{total,revisar,semJustificativa:semj,percentual:perc},timestamp:Date.now()}; }
+  function enviar(){const payload=coletar(); db.ref('sensores/'+SISTEMA_ID).set(payload).then(()=>console.log('🟢 Sensor Auditoria ativo',payload));}
+  setTimeout(enviar,4000); setInterval(enviar,30000);
 })();
+</script>
+
 </script>
 </body>
 </html>
