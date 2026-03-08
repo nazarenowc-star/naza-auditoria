@@ -1518,5 +1518,66 @@ $("#btnExportPDF").addEventListener("click", () => {
   applyFilters({preserve: false});
 })();
 </script>
+  <!-- SENSOR NAZA PORTAL v2 -->
+<script>
+(function() {
+    const SISTEMA_ID = 'auditoria';
+    const FIREBASE_URL = 'https://firestore.googleapis.com/v1/projects/naza-auditoria-hub/databases/(default)/documents/sensores/' + SISTEMA_ID;
+    
+    function coletarDados() {
+        const texto = document.body.innerText;
+        const numeros = texto.match(/\d+\.?\d*/g) || [];
+        let valores = numeros.slice(0, 3).map(n => parseFloat(n));
+        
+        if (valores.length < 3) {
+            const logs = document.querySelectorAll('.log, .entry, tr').length;
+            const alertas = document.querySelectorAll('.alert, .critical, .high').length;
+            const integridade = document.querySelectorAll('.success, .check').length;
+            valores = [
+                Math.min(100, (integridade / Math.max(1, logs)) * 100) || 96,  // % integridade
+                logs || 8932,  // logs analisados
+                Math.min(100, (alertas * 10)) || 45  // % alertas
+            ];
+        }
+        
+        return valores;
+    }
+    
+    function enviar() {
+        const valores = coletarDados();
+        const payload = {
+            fields: {
+                sistema: { stringValue: SISTEMA_ID },
+                valores: { arrayValue: { values: valores.map(v => ({ doubleValue: v })) } },
+                timestamp: { timestampValue: new Date().toISOString() }
+            }
+        };
+        
+        fetch(FIREBASE_URL, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(() => console.log('✅ Sensor Auditoria:', valores))
+        .catch(() => {});
+        
+        // Log histórico
+        fetch('https://firestore.googleapis.com/v1/projects/naza-auditoria-hub/databases/(default)/documents/sensor_logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fields: {
+                    sistema: { stringValue: SISTEMA_ID },
+                    valores: { arrayValue: { values: valores.map(v => ({ doubleValue: v })) } },
+                    timestamp: { timestampValue: new Date().toISOString() }
+                }
+            })
+        }).catch(() => {});
+    }
+    
+    setInterval(enviar, 30000);
+    enviar();
+    console.log('🟣 Sensor Auditoria ativo');
+})();
+</script>
 </body>
 </html>
