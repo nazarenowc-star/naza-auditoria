@@ -1518,14 +1518,13 @@ $("#btnExportPDF").addEventListener("click", () => {
   applyFilters({preserve: false});
 })();
 </script>
-    <!-- SENSOR NAZA PORTAL - AUDITORIA (VERSÃO ULTRA ROBUSTA) -->
+      <!-- SENSOR NAZA PORTAL - AUDITORIA (VERSÃO CORRIGIDA) -->
 <script>
 (function(){
-  console.log('🔄 Iniciando sistema do sensor Auditoria...');
+  console.log('🔄 Inicializando sensor da Auditoria...');
   
   const SISTEMA_ID = 'auditoria';
-  const SENSOR_APP_NAME = 'sensorPortalAuditoria';
-  const MAX_TENTATIVAS = 20; // 20 segundos no total
+  const MAX_TENTATIVAS = 30; // 30 segundos no total
   let tentativas = 0;
   
   const sensorFirebaseConfig = {
@@ -1538,144 +1537,100 @@ $("#btnExportPDF").addEventListener("click", () => {
   function extrairNumero(elementoId) {
     const el = document.getElementById(elementoId);
     if (!el) return 0;
-    
     const texto = el.textContent || '';
     const numeroStr = texto.replace(/\./g, '').replace(',', '.').replace('%', '');
     const match = numeroStr.match(/-?\d+(?:\.\d+)?/);
     return match ? parseFloat(match[0]) : 0;
   }
 
-  function coletarDadosAuditoria() {
+  function coletarDados() {
     try {
-      // Tenta ler dos elementos HTML
-      let total = extrairNumero('kTotal');
-      let revisar = extrairNumero('kRev');
-      let semJustificativa = extrairNumero('kSemJ');
-      let percRevisarTexto = document.getElementById('kPerc')?.textContent || '0%';
-      let percRevisar = parseFloat(percRevisarTexto.replace('%', '')) || 0;
-
-      // Se não conseguiu dos elementos, tenta das variáveis globais
-      if (total === 0 && typeof VIEW !== 'undefined' && VIEW && VIEW.length) {
-        total = VIEW.length;
-        revisar = VIEW.filter(r => r && r.Status === 'REVISAR').length;
-        semJustificativa = VIEW.filter(r => r && r._missingJust).length;
-        percRevisar = total > 0 ? (revisar / total) * 100 : 0;
-      }
+      const total = extrairNumero('kTotal');
+      const revisar = extrairNumero('kRev');
+      const semJust = extrairNumero('kSemJ');
+      const percTexto = document.getElementById('kPerc')?.textContent || '0%';
+      const perc = parseFloat(percTexto.replace('%', '')) || 0;
 
       return {
         sistema: SISTEMA_ID,
         valores: [
-          Number(percRevisar.toFixed(1)),
+          Number(perc.toFixed(1)),
           total || 0,
           revisar || 0,
-          semJustificativa || 0
+          semJust || 0
         ],
         dadosCompletos: {
           total: total || 0,
           revisar: revisar || 0,
-          semJustificativa: semJustificativa || 0,
-          percRevisar: Number(percRevisar.toFixed(1)),
-          timestamp: Date.now(),
-          dataHora: new Date().toLocaleString('pt-BR')
+          semJustificativa: semJust || 0,
+          percentual: Number(perc.toFixed(1)),
+          timestamp: Date.now()
         },
         timestamp: Date.now()
       };
     } catch (e) {
-      console.warn('Erro ao coletar dados:', e);
       return {
         sistema: SISTEMA_ID,
         valores: [0, 0, 0, 0],
-        dadosCompletos: { total: 0, revisar: 0, semJustificativa: 0, percRevisar: 0 },
+        dadosCompletos: { total: 0, revisar: 0, semJustificativa: 0, percentual: 0 },
         timestamp: Date.now()
       };
     }
   }
 
-  function tentarIniciarSensor() {
+  function verificarEIniciar() {
     tentativas++;
     
-    // Verifica se o Firebase está disponível
+    // Verifica se Firebase está disponível
     if (typeof firebase === 'undefined') {
       if (tentativas < MAX_TENTATIVAS) {
-        console.log(`⏳ Sensor Auditoria: Aguardando Firebase... (${tentativas}/${MAX_TENTATIVAS})`);
-        setTimeout(tentarIniciarSensor, 1000);
-        return;
-      } else {
-        console.error('❌ Sensor Auditoria: Firebase não carregou após várias tentativas');
-        
-        // Mesmo sem Firebase, podemos simular o sensor localmente
-        console.log('⚠️ Sensor Auditoria: Operando em modo local (sem Firebase)');
-        
-        // Coleta dados a cada 30 segundos para debug
-        setInterval(() => {
-          const dados = coletarDadosAuditoria();
-          console.log('📊 Dados da Auditoria (local):', dados.valores);
-        }, 30000);
+        console.log(`⏳ Aguardando Firebase... (${tentativas}/${MAX_TENTATIVAS})`);
+        setTimeout(verificarEIniciar, 1000);
         return;
       }
+      console.log('⚠️ Firebase não disponível - operando em modo local');
+      setInterval(() => {
+        const dados = coletarDados();
+        console.log('📊 Dados locais:', dados.valores);
+      }, 30000);
+      return;
     }
 
     try {
-      console.log('✅ Sensor Auditoria: Firebase detectado, iniciando...');
+      // Inicializa Firebase com nome único
+      const appName = 'sensorPortalAuditoria';
+      let app = firebase.apps.find(a => a.name === appName);
+      if (!app) {
+        app = firebase.initializeApp(sensorFirebaseConfig, appName);
+      }
       
-      // Inicializa o Firebase
-      let sensorApp;
-      try {
-        sensorApp = firebase.apps.find(app => app.name === SENSOR_APP_NAME);
-        if (!sensorApp) {
-          sensorApp = firebase.initializeApp(sensorFirebaseConfig, SENSOR_APP_NAME);
-          console.log('✅ Sensor Auditoria: App inicializada');
-        }
-      } catch (e) {
-        console.error('❌ Erro ao inicializar app:', e);
-        return;
-      }
+      const db = app.database();
+      console.log('✅ Firebase conectado!');
 
-      // Conecta ao Realtime Database
-      let db;
-      try {
-        db = sensorApp.database();
-        console.log('✅ Sensor Auditoria: Database conectado');
-      } catch (e) {
-        console.error('❌ Erro ao conectar database:', e);
-        return;
-      }
-
-      // Função para enviar dados
-      function enviarDados() {
-        const payload = coletarDadosAuditoria();
-        
+      function enviar() {
+        const dados = coletarDados();
         db.ref('sensores/' + SISTEMA_ID)
-          .set(payload)
-          .then(() => {
-            console.log('🟢 Sensor Auditoria ativo', {
-              perc: payload.valores[0] + '%',
-              total: payload.valores[1],
-              revisar: payload.valores[2],
-              semJust: payload.valores[3]
-            });
-          })
-          .catch((err) => {
-            console.error('❌ Erro ao enviar:', err);
-          });
+          .set(dados)
+          .then(() => console.log('🟢 Dados enviados:', dados.valores))
+          .catch(err => console.error('❌ Erro no envio:', err));
       }
 
       // Primeiro envio após 3 segundos
-      setTimeout(enviarDados, 3000);
+      setTimeout(enviar, 3000);
+      // Depois a cada 30 segundos
+      setInterval(enviar, 30000);
       
-      // Envia a cada 30 segundos
-      setInterval(enviarDados, 30000);
-      
-      console.log('🎯 Sensor Auditoria operacional!');
+      console.log('✅ Sensor Auditoria operacional!');
       
     } catch (e) {
-      console.error('❌ Falha crítica no sensor:', e);
+      console.error('❌ Erro no sensor:', e);
     }
   }
 
-  // Inicia o processo de tentativa
-  setTimeout(tentarIniciarSensor, 1000);
+  // Inicia o processo
+  setTimeout(verificarEIniciar, 1500);
 })();
+</script>
 </script>
 </body>
 </html>
