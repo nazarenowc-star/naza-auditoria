@@ -14,9 +14,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- Firebase SDK (CORREÇÃO ADICIONADA) -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
+<!-- Firebase SDK v8 (VERSÃO COMPATÍVEL COM CDN) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <style>
 :root{
@@ -1602,12 +1602,19 @@ $("#btnExportPDF").addEventListener("click", () => {
 
     try {
       const appName = 'sensorPortalAuditoria';
-      let app = firebase.apps.find(a => a.name === appName);
-      if (!app) {
+      let app = null;
+      
+      // Verifica se já existe app com esse nome
+      const apps = firebase.apps;
+      const existingApp = apps.find(a => a.name === appName);
+      
+      if (existingApp) {
+        app = existingApp;
+      } else {
         app = firebase.initializeApp(sensorFirebaseConfig, appName);
       }
       
-      const db = app.database();
+      const db = firebase.database(app);
       console.log('✅ Firebase conectado!');
 
       function enviar() {
