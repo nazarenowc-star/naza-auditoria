@@ -1518,13 +1518,14 @@ $("#btnExportPDF").addEventListener("click", () => {
   applyFilters({preserve: false});
 })();
 </script>
-      <!-- SENSOR NAZA PORTAL - AUDITORIA (VERSÃO CORRIGIDA) -->
+
+<!-- SENSOR NAZA PORTAL - AUDITORIA (VERSÃO CORRIGIDA) -->
 <script>
 (function(){
   console.log('🔄 Inicializando sensor da Auditoria...');
   
   const SISTEMA_ID = 'auditoria';
-  const MAX_TENTATIVAS = 30; // 30 segundos no total
+  const MAX_TENTATIVAS = 30;
   let tentativas = 0;
   
   const sensorFirebaseConfig = {
@@ -1581,7 +1582,6 @@ $("#btnExportPDF").addEventListener("click", () => {
   function verificarEIniciar() {
     tentativas++;
     
-    // Verifica se Firebase está disponível
     if (typeof firebase === 'undefined') {
       if (tentativas < MAX_TENTATIVAS) {
         console.log(`⏳ Aguardando Firebase... (${tentativas}/${MAX_TENTATIVAS})`);
@@ -1597,7 +1597,6 @@ $("#btnExportPDF").addEventListener("click", () => {
     }
 
     try {
-      // Inicializa Firebase com nome único
       const appName = 'sensorPortalAuditoria';
       let app = firebase.apps.find(a => a.name === appName);
       if (!app) {
@@ -1615,9 +1614,7 @@ $("#btnExportPDF").addEventListener("click", () => {
           .catch(err => console.error('❌ Erro no envio:', err));
       }
 
-      // Primeiro envio após 3 segundos
       setTimeout(enviar, 3000);
-      // Depois a cada 30 segundos
       setInterval(enviar, 30000);
       
       console.log('✅ Sensor Auditoria operacional!');
@@ -1627,10 +1624,8 @@ $("#btnExportPDF").addEventListener("click", () => {
     }
   }
 
-  // Inicia o processo
   setTimeout(verificarEIniciar, 1500);
 })();
-</script>
 </script>
 </body>
 </html>
